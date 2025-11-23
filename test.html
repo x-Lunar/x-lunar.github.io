@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>p5.js Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+    
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        /* Console Styles */
+        .console-msg {
+            border-bottom: 1px solid #333; padding: 4px 8px;
+            font-family: monospace; font-size: 13px;
+            white-space: pre-wrap; word-break: break-all;
+        }
+        .console-log { color: #ccc; }
+        .console-warn { color: #fbbf24; background: #292200; }
+        .console-error { color: #f87171; background: #2e1010; }
+        .console-info { color: #60a5fa; }
+        
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-left-color: #ec4899; /* Pink-500 */
+            border-radius: 50%; width: 20px; height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* AI Markdown Styles */
+        .ai-content p { margin-bottom: 0.5em; }
+        .ai-content code { background: #333; padding: 2px 4px; rounded: 3px; font-family: monospace; }
+        .ai-content pre { background: #111; padding: 10px; overflow-x: auto; border-radius: 5px; margin-bottom: 10px; }
+
+        /* CodeMirror Styling */
+        .CodeMirror {
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            height: 100%;
+            background: #1e1e1e; /* Match the original bg */
+        }
+        .CodeMirror-gutters {
+            background: #1e1e1e !important; /* Match editor bg */
+            border-right: 1px solid #2a2a2a;
+        }
+        .CodeMirror-linenumber {
+            color: #555;
+            padding: 0 5px;
+        }
+        .CodeMirror-activeline-background {
+            background: #2a2a2a; /* Slightly lighter bg for active line */
+        }
+    </style>
+</head>
+<body class="bg-zinc-900 text-gray-200 h-screen flex flex-col overflow-hidden">
+
+    <header class="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
+        <div class="flex items-center gap-4">
+            <a href="x-Lunar/index.html" class="text-zinc-400 hover:text-white transition-colors" title="Back to Home">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            </a>
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-pink-600 rounded flex items-center justify-center font-bold text-white">p5</div>
+                <h1 class="font-semibold text-lg tracking-tight">Studio</h1>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <button id="aiModalBtn" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-1.5 rounded text-sm font-medium flex items-center gap-2 transition-all shadow-lg shadow-purple-900/20">
+                <i data-lucide="sparkles" class="w-4 h-4 fill-current"></i> AI Assistant
+            </button>
+            <div class="h-6 w-px bg-zinc-800 mx-1"></div>
+            <span class="text-xs text-zinc-500 hidden sm:inline">Ctrl + Enter to Run</span>
+            <button id="runBtn" class="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1.5 rounded text-sm font-medium flex items-center gap-2 transition-colors border border-zinc-700">
+                <i data-lucide="play" class="w-4 h-4 fill-current"></i> Run
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex flex-col md:flex-row min-h-0 relative">
+        
+        <div class="flex-1 flex flex-col border-r border-zinc-800 min-w-0">
+            <div class="bg-zinc-900 px-4 py-2 text-xs font-mono text-zinc-400 border-b border-zinc-800 flex justify-between">
+                <span>sketch.js</span>
+                </div>
+            <div class="relative flex-1 bg-[#1e1e1e]">
+                <textarea 
+                    id="editor" 
+                    spellcheck="false"
+                ></textarea>
+            </div>
+        </div>
+
+        <div class="flex-1 flex flex-col min-w-0 bg-zinc-950">
+            
+            <div class="flex-1 relative bg-zinc-800 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyU1LDMC4wNSkiLz48L3N2Zz4=')]">
+                <div class="absolute inset-0 flex items-center justify-center text-zinc-600 pointer-events-none" id="placeholder">
+                    <span>Canvas Preview</span>
+                </div>
+                <iframe id="previewFrame" class="w-full h-full border-none" sandbox="allow-scripts allow-same-origin allow-popups allow-modals allow-pointer-lock"></iframe>
+            </div>
+
+            <div class="h-48 flex flex-col border-t border-zinc-800 bg-zinc-900 shrink-0">
+                <div class="px-3 py-1.5 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="terminal" class="w-3 h-3 text-zinc-400"></i>
+                        <span class="text-xs font-medium text-zinc-400">Console</span>
+                    </div>
+                    <button id="clearConsole" class="text-zinc-500 hover:text-zinc-300 transition-colors">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i>
+                    </button>
+                </div>
+                <div id="consoleOutput" class="flex-1 overflow-y-auto p-0 text-sm font-mono scroll-smooth"></div>
+            </div>
+        </div>
+
+        <div id="aiModal" class="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-zinc-900 border border-zinc-700 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 rounded-t-xl">
+                    <div class="flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 font-bold text-lg">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-pink-500"></i> AI Assistant
+                    </div>
+                    <button id="closeAiModal" class="text-zinc-500 hover:text-white transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <div class="p-6 overflow-y-auto custom-scrollbar">
+                    <div class="mb-4">
+                        <label class="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wide">Ask Gemini</label>
+                        <textarea id="aiPrompt" rows="3" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-pink-500 transition-colors resize-none" placeholder="E.g., Draw a recursive tree that sways in the wind, or Explain the current code..."></textarea>
+                    </div>
+
+                    <div class="flex gap-2 mb-6">
+                        <button id="btnGenerate" class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-2 rounded-lg text-sm font-medium transition-all flex justify-center items-center gap-2">
+                            <span>Generate Sketch ✨</span>
+                        </button>
+                        <button id="btnExplain" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2 rounded-lg text-sm font-medium transition-colors border border-zinc-700 flex justify-center items-center gap-2">
+                            <span>Explain Code 🧠</span>
+                        </button>
+                    </div>
+
+                    <div id="aiOutputContainer" class="hidden">
+                        <div class="flex items-center gap-2 mb-2 text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                            <span>Result</span>
+                            <div id="aiLoader" class="loader hidden"></div>
+                        </div>
+                        <div id="aiResponse" class="bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-sm text-gray-300 ai-content max-h-60 overflow-y-auto">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Elements
+        const runBtn = document.getElementById('runBtn');
+        const previewFrame = document.getElementById('previewFrame');
+        const consoleOutput = document.getElementById('consoleOutput');
+        const clearConsoleBtn = document.getElementById('clearConsole');
+        const placeholder = document.getElementById('placeholder');
+        
+        // AI Elements
+        const aiModalBtn = document.getElementById('aiModalBtn');
+        const aiModal = document.getElementById('aiModal');
+        const closeAiModal = document.getElementById('closeAiModal');
+        const aiPrompt = document.getElementById('aiPrompt');
+        const btnGenerate = document.getElementById('btnGenerate');
+        const btnExplain = document.getElementById('btnExplain');
+        const aiOutputContainer = document.getElementById('aiOutputContainer');
+        const aiResponse = document.getElementById('aiResponse');
+        const aiLoader = document.getElementById('aiLoader');
+
+        const apiKey = ""; // API Key provided by environment
+
+        // --- ADDED: Default Code ---
+        const defaultCode = `function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  angleMode(DEGREES);
+  strokeWeight(5);
+  noFill();
+  stroke(32, 8, 64);
+  describe(
+    'Users can click on the screen and drag to adjust their perspective in 3D space. The space contains a sphere of dark purple cubes on a light pink background.'
+  );
+}
+
+function draw() {
+  background(250, 180, 200);
+
+  // Call every frame to adjust camera based on mouse/touch
+  orbitControl();
+
+  // Rotate rings in a half circle to create a sphere of cubes
+  for (let zAngle = 0; zAngle < 180; zAngle += 30) {
+    // Rotate cubes in a full circle to create a ring of cubes
+    for (let xAngle = 0; xAngle < 360; xAngle += 30) {
+      push();
+
+      // Rotate from center of sphere
+      rotateZ(zAngle);
+      rotateX(xAngle);
+
+      // Then translate down 400 units
+      translate(0, 400, 0);
+      box();
+      pop();
+    }
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+`;
+
+        // --- EDITOR & CONSOLE LOGIC ---
+
+        let codeEditor; // To hold the CodeMirror instance
+        const editorTextarea = document.getElementById('editor'); // Get the textarea
+        
+        function initializeEditor(initialValue) {
+            editorTextarea.value = initialValue; // Set the default code
+
+            codeEditor = CodeMirror.fromTextArea(editorTextarea, {
+                lineNumbers: true,
+                mode: "javascript",
+                theme: "material-darker",
+                tabSize: 2,
+                lineWrapping: true,
+                matchBrackets: true,
+                autoCloseBrackets: true,
+                styleActiveLine: true,
+            });
+
+            // Handle Ctrl+Enter in CodeMirror
+            codeEditor.setOption("extraKeys", {
+                "Cmd-Enter": runSketch,
+                "Ctrl-Enter": runSketch
+            });
+        }
+
+        // REMOVED: Old textarea 'keydown' listener
+
+        function logToConsole(type, args) {
+            const row = document.createElement('div');
+            row.className = `console-msg console-${type}`;
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try { return JSON.stringify(arg, null, 2); } catch (e) { return '[Circular]'; }
+                }
+                return String(arg);
+            }).join(' ');
+            row.textContent = `> ${message}`;
+            consoleOutput.appendChild(row);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        clearConsoleBtn.addEventListener('click', () => consoleOutput.innerHTML = '');
+
+        window.addEventListener('message', (event) => {
+            if (event.data.source === 'p5-console') {
+                logToConsole(event.data.type, event.data.args);
+            }
+        });
+
+        function runSketch() {
+            const code = codeEditor.getValue(); // UPDATED: Get code from CodeMirror
+            placeholder.style.display = 'none';
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body { margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: transparent; }
+                        canvas { display: block; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+                    </style>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"><\/script>
+                    <script>
+                        (function() {
+                            const originalLog = console.log;
+                            const originalWarn = console.warn;
+                            const originalError = console.error;
+                            const originalInfo = console.info;
+                            function send(type, args) {
+                                window.parent.postMessage({ source: 'p5-console', type: type, args: Array.from(args) }, '*');
+                            }
+                            console.log = function(...args) { originalLog.apply(console, args); send('log', args); };
+                            console.warn = function(...args) { originalWarn.apply(console, args); send('warn', args); };
+                            console.error = function(...args) { originalError.apply(console, args); send('error', args); };
+                            console.info = function(...args) { originalInfo.apply(console, args); send('info', args); };
+                            window.onerror = function(msg, url, lineNo, columnNo, error) {
+                                send('error', [\`Error: \${msg} (Line \${lineNo})\`]); return false; 
+                            };
+                        })();
+                    <\/script>
+                </head>
+                <body>
+                    <script>
+                        try { ${code} } catch (err) { console.error(err.message); }
+                    <\/script>
+                </body>
+                </html>
+            `;
+            previewFrame.srcdoc = html;
+        }
+
+        runBtn.addEventListener('click', runSketch);
+        
+        initializeEditor(defaultCode); // ADDED: Initialize the editor
+        setTimeout(runSketch, 500); // Initial run
+
+        // --- AI LOGIC ---
+
+        function toggleModal(show) {
+            if (show) {
+                aiModal.classList.remove('hidden');
+                aiPrompt.focus();
+            } else {
+                aiModal.classList.add('hidden');
+            }
+        }
+
+        aiModalBtn.addEventListener('click', () => toggleModal(true));
+        closeAiModal.addEventListener('click', () => toggleModal(false));
+        aiModal.addEventListener('click', (e) => {
+            if (e.target === aiModal) toggleModal(false);
+        });
+
+        async function callGemini(systemPrompt, userPrompt) {
+            // ... (rest of function is unchanged)
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            // Exponential backoff
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    const data = await response.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+                } catch (error) {
+                    if (i === 4) return `Error: ${error.message}. Please try again.`;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+
+        async function handleGenerate() {
+            const prompt = aiPrompt.value.trim();
+            if (!prompt) return;
+
+            // UI State
+            btnGenerate.disabled = true;
+            btnGenerate.classList.add('opacity-50');
+            aiLoader.classList.remove('hidden');
+            aiOutputContainer.classList.remove('hidden');
+            aiResponse.innerHTML = '<span class="text-zinc-500 italic">Dreaming up code...</span>';
+
+            const systemPrompt = `You are an expert creative coder using p5.js. 
+            Your task is to write a COMPLETE, RUNNABLE p5.js sketch based on the user's description.
+            - Provide ONLY valid JavaScript code.
+            - Do NOT wrap code in markdown blocks (no \`\`\`js ... \`\`\`).
+            - Do NOT add explanations outside the code.
+            - Ensure you include function setup() and function draw().
+            - If the user asks for 3D, use WEBGL mode.
+            - Make the sketch visually interesting and handle windowResized() if possible.`;
+
+            const result = await callGemini(systemPrompt, prompt);
+            
+            // Clean up result just in case
+            let cleanCode = result.replace(/```javascript/g, '').replace(/```js/g, '').replace(/```/g, '').trim();
+
+            aiResponse.innerHTML = `<span class="text-green-400">Sketch generated successfully! Loading into editor...</span>`;
+            
+            // Update editor and run
+            codeEditor.setValue(cleanCode); // UPDATED: Set value in CodeMirror
+            runSketch();
+            
+            setTimeout(() => {
+                toggleModal(false);
+                aiResponse.innerHTML = '';
+                aiOutputContainer.classList.add('hidden');
+            }, 1500);
+
+            // Reset UI
+            btnGenerate.disabled = false;
+            btnGenerate.classList.remove('opacity-50');
+            aiLoader.classList.add('hidden');
+        }
+
+        async function handleExplain() {
+            const code = codeEditor.getValue(); // UPDATED: Get value from CodeMirror
+            
+            // UI State
+            btnExplain.disabled = true;
+            btnExplain.classList.add('opacity-50');
+            aiLoader.classList.remove('hidden');
+            aiOutputContainer.classList.remove('hidden');
+            aiResponse.innerHTML = '<span class="text-zinc-500 italic">Analyzing code...</span>';
+
+            const systemPrompt = `You are a helpful p5.js tutor. 
+            Explain the following code concisely to a beginner/intermediate creative coder.
+            Highlight the key techniques used (e.g., loops, transformations, arrays).
+            Use Markdown for formatting.`;
+
+            const prompt = `Here is my p5.js code:\n\n${code}\n\nCan you explain how it works?`;
+
+            const result = await callGemini(systemPrompt, prompt);
+            
+            // Render Markdown
+            aiResponse.innerHTML = marked.parse(result);
+
+            // Reset UI
+            btnExplain.disabled = false;
+            btnExplain.classList.remove('opacity-50');
+            aiLoader.classList.add('hidden');
+        }
+
+        btnGenerate.addEventListener('click', handleGenerate);
+        btnExplain.addEventListener('click', handleExplain);
+
+    </script>
+</body>
+</html>
