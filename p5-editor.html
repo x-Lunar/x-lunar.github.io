@@ -55,7 +55,7 @@
 
         /* AI Markdown Styles */
         .ai-content p { margin-bottom: 0.5em; }
-        .ai-content code { background: #333; padding: 2px 4px; rounded: 3px; font-family: monospace; }
+        .ai-content code { background: #333; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
         .ai-content pre { background: #111; padding: 10px; overflow-x: auto; border-radius: 5px; margin-bottom: 10px; }
     </style>
 </head>
@@ -63,9 +63,14 @@
 
     <!-- Header -->
     <header class="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-pink-600 rounded flex items-center justify-center font-bold text-white">p5</div>
-            <h1 class="font-semibold text-lg tracking-tight">Studio</h1>
+        <div class="flex items-center gap-4">
+            <a href="index.html" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded text-sm font-medium flex items-center gap-1 transition-colors border border-zinc-700">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i> Hub
+            </a>
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-pink-600 rounded flex items-center justify-center font-bold text-white">p5</div>
+                <h1 class="font-semibold text-lg tracking-tight">Studio</h1>
+            </div>
         </div>
         
         <div class="flex items-center gap-3">
@@ -93,8 +98,7 @@
                     id="editor" 
                     class="absolute inset-0 w-full h-full bg-transparent text-gray-300 p-4 resize-none focus:outline-none leading-relaxed text-sm"
                     spellcheck="false"
-                >
-function setup() {
+                >function setup() {
   createCanvas(windowWidth, windowHeight);
   background(20);
 }
@@ -187,6 +191,25 @@ function windowResized() {
             </div>
         </div>
 
+        <!-- API Key Setup Modal -->
+        <div id="apiKeyModal" class="absolute inset-0 z-[60] bg-black/90 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-zinc-900 border border-yellow-500/50 w-full max-w-sm rounded-xl shadow-2xl p-6">
+                <h3 class="text-xl font-bold mb-2 text-yellow-400 flex items-center gap-2">
+                    <i data-lucide="key" class="w-5 h-5"></i> API Key Required
+                </h3>
+                <p class="text-sm text-zinc-300 mb-4">
+                    To use the AI Assistant, please enter your Gemini API Key. This key is saved locally in your browser.
+                </p>
+                <input type="text" id="userApiKeyInput" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-yellow-500 transition-colors mb-4" placeholder="Enter your key here (e.g., AIzaSy...)">
+                <button id="saveApiKeyBtn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                    Save Key & Enable AI
+                </button>
+                <p class="text-xs text-zinc-500 mt-3 text-center">
+                    <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="underline hover:text-yellow-400">Get your key from Google AI Studio</a>
+                </p>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -212,9 +235,82 @@ function windowResized() {
         const aiResponse = document.getElementById('aiResponse');
         const aiLoader = document.getElementById('aiLoader');
 
-        const apiKey = "AIzaSyBYHPR6lVP6DDpFt0m_HKoksaAbzZ63_yQ"; // API Key provided by environment
+        // API Key Elements
+        const apiKeyModal = document.getElementById('apiKeyModal');
+        const userApiKeyInput = document.getElementById('userApiKeyInput');
+        const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
 
-        // --- EDITOR & CONSOLE LOGIC ---
+        // Initial API Key from environment (will be empty on GitHub Pages)
+        // Temporary fix: Use the key provided by the user as a fallback default.
+        const FALLBACK_API_KEY = "AIzaSyBYHPR6lVP6DDpFt0m_HKoksaAbzZ63_yQ"; 
+        let currentApiKey = ""; 
+
+        // --- API KEY MANAGEMENT ---
+        
+        // Function to load the key from localStorage
+        function loadApiKey() {
+            const storedKey = localStorage.getItem('geminiApiKey');
+            
+            // 1. Check if the runtime environment provided a key (e.g., in a development platform)
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== "") {
+                currentApiKey = __initial_auth_token;
+            } 
+            // 2. Check local storage (user previously entered it)
+            else if (storedKey) {
+                currentApiKey = storedKey;
+            } 
+            // 3. Use the temporary fallback key provided by the user
+            else if (FALLBACK_API_KEY) {
+                currentApiKey = FALLBACK_API_KEY;
+                // Since we're using the fallback, save it to local storage for persistence
+                localStorage.setItem('geminiApiKey', FALLBACK_API_KEY);
+            } else {
+                currentApiKey = ""; 
+            }
+            updateAiButtonState();
+        }
+
+        // Function to update the AI button style based on key availability
+        function updateAiButtonState() {
+            if (currentApiKey) {
+                aiModalBtn.classList.remove('opacity-50', 'bg-zinc-700', 'cursor-not-allowed');
+                aiModalBtn.classList.add('bg-gradient-to-r', 'from-purple-600', 'to-pink-600');
+                aiModalBtn.title = "Open AI Assistant";
+            } else {
+                aiModalBtn.classList.add('opacity-50', 'bg-zinc-700', 'cursor-not-allowed');
+                aiModalBtn.classList.remove('bg-gradient-to-r', 'from-purple-600', 'to-pink-600');
+                aiModalBtn.title = "API Key required to use AI";
+            }
+        }
+
+        // Open the AI Modal, but first check for the key
+        aiModalBtn.addEventListener('click', () => {
+            if (currentApiKey) {
+                // If a key is present (either environment, local storage, or fallback), open AI modal
+                toggleModal(true);
+            } else {
+                // If no key is found anywhere, show the API key input modal
+                apiKeyModal.classList.remove('hidden');
+                userApiKeyInput.focus();
+            }
+        });
+
+        // Save the key from the modal
+        saveApiKeyBtn.addEventListener('click', () => {
+            const key = userApiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem('geminiApiKey', key);
+                currentApiKey = key;
+                apiKeyModal.classList.add('hidden');
+                updateAiButtonState();
+                toggleModal(true); // Open the AI modal after saving
+            } else {
+                userApiKeyInput.placeholder = "Key cannot be empty!";
+                userApiKeyInput.classList.add('border-red-500');
+            }
+        });
+
+        // --- EDITOR & CONSOLE LOGIC (Unchanged) ---
 
         // Allow Tab indentation in Textarea
         editor.addEventListener('keydown', function(e) {
@@ -294,7 +390,11 @@ function windowResized() {
         }
 
         runBtn.addEventListener('click', runSketch);
-        setTimeout(runSketch, 500); // Initial run
+        setTimeout(() => {
+            loadApiKey(); // Load key immediately
+            runSketch();
+        }, 500); // Initial run
+
 
         // --- AI LOGIC ---
 
@@ -307,14 +407,15 @@ function windowResized() {
             }
         }
 
-        aiModalBtn.addEventListener('click', () => toggleModal(true));
         closeAiModal.addEventListener('click', () => toggleModal(false));
         aiModal.addEventListener('click', (e) => {
             if (e.target === aiModal) toggleModal(false);
         });
 
         async function callGemini(systemPrompt, userPrompt) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            if (!currentApiKey) return "Error: Gemini API Key is missing. Please enter your key to enable the AI features.";
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${currentApiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: userPrompt }] }],
                 systemInstruction: { parts: [{ text: systemPrompt }] }
@@ -330,12 +431,17 @@ function windowResized() {
                         body: JSON.stringify(payload)
                     });
                     
+                    if (response.status === 400) {
+                        const errorData = await response.json();
+                        // This specific error might mean the key is invalid or quota is exceeded
+                        return `API Error: ${errorData.error.message || 'Check your API key and quota.'}`;
+                    }
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     
                     const data = await response.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated. The model may have refused the prompt.";
                 } catch (error) {
-                    if (i === 4) return `Error: ${error.message}. Please try again.`;
+                    if (i === 4) return `Network Error: ${error.message}. Please check your connection or try again later.`;
                     await new Promise(r => setTimeout(r, delays[i]));
                 }
             }
@@ -344,6 +450,11 @@ function windowResized() {
         async function handleGenerate() {
             const prompt = aiPrompt.value.trim();
             if (!prompt) return;
+            if (!currentApiKey) {
+                aiModal.classList.add('hidden');
+                apiKeyModal.classList.remove('hidden');
+                return;
+            }
 
             // UI State
             btnGenerate.disabled = true;
@@ -363,20 +474,26 @@ function windowResized() {
 
             const result = await callGemini(systemPrompt, prompt);
             
-            // Clean up result just in case
-            let cleanCode = result.replace(/```javascript/g, '').replace(/```js/g, '').replace(/```/g, '').trim();
+            // Handle API errors
+            if (result.startsWith("Error:") || result.startsWith("API Error:") || result.startsWith("Network Error:")) {
+                aiResponse.innerHTML = `<span class="text-red-400">${result}</span>`;
+            } else {
+                // Success: Process and run code
+                let cleanCode = result.replace(/```javascript/g, '').replace(/```js/g, '').replace(/```/g, '').trim();
 
-            aiResponse.innerHTML = `<span class="text-green-400">Sketch generated successfully! Loading into editor...</span>`;
-            
-            // Update editor and run
-            editor.value = cleanCode;
-            runSketch();
-            
-            setTimeout(() => {
-                toggleModal(false);
-                aiResponse.innerHTML = '';
-                aiOutputContainer.classList.add('hidden');
-            }, 1500);
+                aiResponse.innerHTML = `<span class="text-green-400">Sketch generated successfully! Loading into editor...</span>`;
+                
+                // Update editor and run
+                editor.value = cleanCode;
+                runSketch();
+                
+                // Close modal after a delay
+                setTimeout(() => {
+                    toggleModal(false);
+                    aiResponse.innerHTML = '';
+                    aiOutputContainer.classList.add('hidden');
+                }, 1500);
+            }
 
             // Reset UI
             btnGenerate.disabled = false;
@@ -386,6 +503,11 @@ function windowResized() {
 
         async function handleExplain() {
             const code = editor.value;
+            if (!currentApiKey) {
+                aiModal.classList.add('hidden');
+                apiKeyModal.classList.remove('hidden');
+                return;
+            }
             
             // UI State
             btnExplain.disabled = true;
@@ -403,8 +525,12 @@ function windowResized() {
 
             const result = await callGemini(systemPrompt, prompt);
             
-            // Render Markdown
-            aiResponse.innerHTML = marked.parse(result);
+            if (result.startsWith("Error:") || result.startsWith("API Error:") || result.startsWith("Network Error:")) {
+                aiResponse.innerHTML = `<span class="text-red-400">${result}</span>`;
+            } else {
+                // Render Markdown
+                aiResponse.innerHTML = marked.parse(result);
+            }
 
             // Reset UI
             btnExplain.disabled = false;
@@ -418,4 +544,3 @@ function windowResized() {
     </script>
 </body>
 </html>
-
